@@ -32,12 +32,6 @@ void Serial::open(const std::string &port)
         return;
     }
 
-    serial_port->set_option(boost::asio::serial_port_base::baud_rate(9600));
-    serial_port->set_option(boost::asio::serial_port_base::character_size(8));
-    serial_port->set_option(boost::asio::serial_port_base::stop_bits(boost::asio::serial_port_base::stop_bits::one));
-    serial_port->set_option(boost::asio::serial_port_base::parity(boost::asio::serial_port_base::parity::none));
-    serial_port->set_option(boost::asio::serial_port_base::flow_control(boost::asio::serial_port_base::flow_control::none));
-
     this->port = port;
     opened = true;
 }

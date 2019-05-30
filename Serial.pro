@@ -17,3 +17,8 @@ win32 {
             -lboost_serialization-mgw73-mt-x64-1_70 -lboost_coroutine-mgw73-mt-x64-1_70 -lboost_atomic-mgw73-mt-x64-1_70 \
             -lboost_chrono-mgw73-mt-x64-1_70 -lboost_wserialization-mgw73-mt-x64-1_70 -lws2_32 -lwsock32
 }
+
+unix {
+    LIBS += -lboost_thread -lboost_system -lboost_timer -lboost_serialization -lboost_coroutine -lboost_atomic \
+            -lboost_chrono -lboost_wserialization -lpthread
+}

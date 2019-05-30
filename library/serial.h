@@ -58,7 +58,7 @@ private:
     std::string port;
 
     bool opened = false;
-    bool debug = false;
+    bool debug = true;
 
     std::unique_ptr<boost::asio::io_context> io_context;
     std::unique_ptr<boost::asio::serial_port> serial_port;
