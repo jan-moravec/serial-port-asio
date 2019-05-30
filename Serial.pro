@@ -5,10 +5,12 @@ CONFIG -= qt
 
 SOURCES += \
         library/serial.cpp \
-        main.cpp
+        main.cpp \
+    library/platform.cpp
 
 HEADERS += \
-    library/serial.h
+    library/serial.h \
+    library/platform.h
 
 win32 {
     INCLUDEPATH += C:/Boost/include/boost-1_70
