@@ -3,6 +3,7 @@
 #include <chrono>
 
 #include "library/serial.h"
+#include "library/platform.h"
 
 void testSpeed(Serial &serial, unsigned bps)
 {
@@ -56,7 +57,13 @@ void testSpeed(Serial &serial, unsigned bps)
 
 int main()
 {
-    Serial serial("/dev/ttyUSB0");
+    std::vector<PortInfo> ports = listPorts();
+    std::cout << ports.size() << std::endl;
+
+    for (const PortInfo &port: ports) {
+        std::cout << port.port << " -- " << port.description << " -- " << port.hardware_id << std::endl;
+    }
+    /*Serial serial("/dev/ttyUSB0");
 
     if (serial) {
         std::vector<unsigned> speeds = {4800, 9600, 19200, 57600, 115200, 230400, 460800, 576000, 921600, 1152000, 2000000, 4000000};
@@ -64,7 +71,7 @@ int main()
         for (unsigned &speed: speeds) {
             testSpeed(serial, speed);
         }
-    }
+    }*/
 
     return 0;
 }
