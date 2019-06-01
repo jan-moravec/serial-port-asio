@@ -22,7 +22,7 @@ void testSpeed(Serial &serial, unsigned bps)
 
     // Read all pending data
     for (unsigned i = 0; i < 10; ++i) {
-        serial.readSome(buffer_read.data(), buffer_size, std::chrono::milliseconds(1));
+        serial.readSome(buffer_read.data(), buffer_size, std::chrono::milliseconds(10));
     }
 
     const unsigned testing_cycles = bps / 8 * 2 / buffer_size;
@@ -35,13 +35,13 @@ void testSpeed(Serial &serial, unsigned bps)
         }
 
         int length;
-        length = serial.write(buffer_write.data(), buffer_size, std::chrono::milliseconds(500));
+        length = serial.write(buffer_write.data(), buffer_size, std::chrono::seconds(1));
         if (length != buffer_size) {
             std::cout << "Error write " << bps  << ": testing_cycle " << i << std::endl;
             return;
         }
 
-        length = serial.readExactly(buffer_read.data(), buffer_size, std::chrono::milliseconds(500));
+        length = serial.readExactly(buffer_read.data(), buffer_size, std::chrono::seconds(1));
         if (length != buffer_size) {
             std::cout << "Error read " << bps  << ": testing_cycle " << i << std::endl;
             return;
@@ -86,6 +86,7 @@ int main()
     std::vector<PortInfo> ports = listPorts();
 
     std::cout << "Found " << ports.size() << " serial port devices." << std::endl;
+
     for (const PortInfo &port: ports) {
         std::cout << "Port " << port.port << std::endl;
         std::cout << "      - " << port.device << std::endl;

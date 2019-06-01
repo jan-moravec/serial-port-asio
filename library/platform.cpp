@@ -1,331 +1,202 @@
 #include "platform.h"
 
 // UNIX specific functions
-#if defined(__unix__) || defined(__unix) || defined(__APPLE__) && defined(__MACH__)
+#if defined(__unix__) || defined(__unix)
 
-#include <vector>
-#include <string>
 #include <sstream>
-#include <stdexcept>
 #include <iostream>
 #include <fstream>
-#include <cstdio>
-#include <cstdarg>
-#include <cstdlib>
-
 #include <glob.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
-#include "serial/serial.h"
-
-using serial::PortInfo;
-using std::istringstream;
-using std::ifstream;
-using std::getline;
-using std::vector;
-using std::string;
-using std::cout;
-using std::endl;
-
-static vector<string> glob(const vector<string>& patterns);
-static string basename(const string& path);
-static string dirname(const string& path);
-static bool path_exists(const string& path);
-static string realpath(const string& path);
-static string usb_sysfs_friendly_name(const string& sys_usb_path);
-static vector<string> get_sysfs_info(const string& device_path);
-static string read_line(const string& file);
-static string usb_sysfs_hw_string(const string& sysfs_path);
-static string format(const char* format, ...);
-
-vector<string>
-glob(const vector<string>& patterns)
+static std::vector<std::string> searchPathname(const std::vector<std::string>& patterns)
 {
-    vector<string> paths_found;
+    std::vector<std::string> paths;
+    glob_t glob_results{};
 
-    if(patterns.size() == 0)
-        return paths_found;
-
-    glob_t glob_results;
-
-    int glob_retval = glob(patterns[0].c_str(), 0, NULL, &glob_results);
-
-    vector<string>::const_iterator iter = patterns.begin();
-
-    while(++iter != patterns.end())
-    {
-        glob_retval = glob(iter->c_str(), GLOB_APPEND, NULL, &glob_results);
+    for (const std::string &pattern : patterns) {
+        glob(pattern.c_str(), GLOB_APPEND, NULL, &glob_results);
     }
 
-    for(int path_index = 0; path_index < glob_results.gl_pathc; path_index++)
-    {
-        paths_found.push_back(glob_results.gl_pathv[path_index]);
+    for (unsigned i = 0; i < glob_results.gl_pathc; i++) {
+        paths.push_back(glob_results.gl_pathv[i]);
     }
 
     globfree(&glob_results);
-
-    return paths_found;
+    return paths;
 }
 
-string
-basename(const string& path)
+static std::string getBasename(const std::string &path)
 {
     size_t pos = path.rfind("/");
 
-    if(pos == std::string::npos)
+    if (pos == std::string::npos) {
         return path;
+    }
 
-    return string(path, pos+1, string::npos);
+    return std::string(path, pos+1, std::string::npos);
 }
 
-string
-dirname(const string& path)
+static std::string getDirname(const std::string &path)
 {
     size_t pos = path.rfind("/");
 
-    if(pos == std::string::npos)
+    if (pos == std::string::npos) {
         return path;
-    else if(pos == 0)
+    } else if(pos == 0) {
         return "/";
+    }
 
-    return string(path, 0, pos);
+    return std::string(path, 0, pos);
 }
 
-bool
-path_exists(const string& path)
+static bool pathExists(const std::string &path)
 {
     struct stat sb;
 
-    if( stat(path.c_str(), &sb ) == 0 )
+    if (stat(path.c_str(), &sb) == 0) {
         return true;
+    }
 
     return false;
 }
 
-string
-realpath(const string& path)
+static std::string getRealpath(const std::string &path)
 {
-    char* real_path = realpath(path.c_str(), NULL);
+    char *real_path = realpath(path.c_str(), NULL);
+    std::string result;
 
-    string result;
-
-    if(real_path != NULL)
-    {
+    if (real_path != NULL) {
         result = real_path;
-
         free(real_path);
     }
 
     return result;
 }
 
-string
-usb_sysfs_friendly_name(const string& sys_usb_path)
+static std::string readLine(const std::string &file)
 {
-    unsigned int device_number = 0;
+    std::ifstream ifs(file.c_str(), std::ifstream::in);
+    std::string line;
 
-    istringstream( read_line(sys_usb_path + "/devnum") ) >> device_number;
-
-    string manufacturer = read_line( sys_usb_path + "/manufacturer" );
-
-    string product = read_line( sys_usb_path + "/product" );
-
-    string serial = read_line( sys_usb_path + "/serial" );
-
-    if( manufacturer.empty() && product.empty() && serial.empty() )
-        return "";
-
-    return format("%s %s %s", manufacturer.c_str(), product.c_str(), serial.c_str() );
-}
-
-vector<string>
-get_sysfs_info(const string& device_path)
-{
-    string device_name = basename( device_path );
-
-    string friendly_name;
-
-    string hardware_id;
-
-    string sys_device_path = format( "/sys/class/tty/%s/device", device_name.c_str() );
-
-    if( device_name.compare(0,6,"ttyUSB") == 0 )
-    {
-        sys_device_path = dirname( dirname( realpath( sys_device_path ) ) );
-
-        if( path_exists( sys_device_path ) )
-        {
-            friendly_name = usb_sysfs_friendly_name( sys_device_path );
-
-            hardware_id = usb_sysfs_hw_string( sys_device_path );
-        }
-    }
-    else if( device_name.compare(0,6,"ttyACM") == 0 )
-    {
-        sys_device_path = dirname( realpath( sys_device_path ) );
-
-        if( path_exists( sys_device_path ) )
-        {
-            friendly_name = usb_sysfs_friendly_name( sys_device_path );
-
-            hardware_id = usb_sysfs_hw_string( sys_device_path );
-        }
-    }
-    else
-    {
-        // Try to read ID string of PCI device
-
-        string sys_id_path = sys_device_path + "/id";
-
-        if( path_exists( sys_id_path ) )
-            hardware_id = read_line( sys_id_path );
-    }
-
-    if( friendly_name.empty() )
-        friendly_name = device_name;
-
-    if( hardware_id.empty() )
-        hardware_id = "n/a";
-
-    vector<string> result;
-    result.push_back(friendly_name);
-    result.push_back(hardware_id);
-
-    return result;
-}
-
-string
-read_line(const string& file)
-{
-    ifstream ifs(file.c_str(), ifstream::in);
-
-    string line;
-
-    if(ifs)
-    {
-        getline(ifs, line);
+    if (ifs) {
+        std::getline(ifs, line);
     }
 
     return line;
 }
 
-string
-format(const char* format, ...)
+static std::string usb_sysfs_friendly_name(const std::string &sys_usb_path)
 {
-    va_list ap;
+    std::string manufacturer = readLine(sys_usb_path + "/manufacturer");
+    std::string product = readLine(sys_usb_path + "/product");
+    std::string serial = readLine(sys_usb_path + "/serial");
 
-    size_t buffer_size_bytes = 256;
+    std::string result;
 
-    string result;
-
-    char* buffer = (char*)malloc(buffer_size_bytes);
-
-    if( buffer == NULL )
-        return result;
-
-    bool done = false;
-
-    unsigned int loop_count = 0;
-
-    while(!done)
-    {
-        va_start(ap, format);
-
-        int return_value = vsnprintf(buffer, buffer_size_bytes, format, ap);
-
-        if( return_value < 0 )
-        {
-            done = true;
-        }
-        else if( return_value >= buffer_size_bytes )
-        {
-            // Realloc and try again.
-
-            buffer_size_bytes = return_value + 1;
-
-            char* new_buffer_ptr = (char*)realloc(buffer, buffer_size_bytes);
-
-            if( new_buffer_ptr == NULL )
-            {
-                done = true;
-            }
-            else
-            {
-                buffer = new_buffer_ptr;
-            }
-        }
-        else
-        {
-            result = buffer;
-            done = true;
-        }
-
-        va_end(ap);
-
-        if( ++loop_count > 5 )
-            done = true;
+    if (!manufacturer.empty()) {
+        result += manufacturer + " ";
     }
-
-    free(buffer);
+    if (!product.empty()) {
+        result += product + " ";
+    }
+    if (!serial.empty()) {
+        result += serial;
+    }
 
     return result;
 }
 
-string
-usb_sysfs_hw_string(const string& sysfs_path)
+std::string usb_sysfs_hw_string(const std::string &sysfs_path)
 {
-    string serial_number = read_line( sysfs_path + "/serial" );
+    std::string serial_number = readLine(sysfs_path + "/serial");
 
-    if( serial_number.length() > 0 )
-    {
-        serial_number = format( "SNR=%s", serial_number.c_str() );
+    if (!serial_number.empty()) {
+        serial_number = "SNR=" + serial_number;
     }
 
-    string vid = read_line( sysfs_path + "/idVendor" );
+    std::string vid = readLine(sysfs_path + "/idVendor");
+    std::string pid = readLine(sysfs_path + "/idProduct");
 
-    string pid = read_line( sysfs_path + "/idProduct" );
+    std::string result = "USB VID:PID=" + vid + ":" + pid;
 
-    return format("USB VID:PID=%s:%s %s", vid.c_str(), pid.c_str(), serial_number.c_str() );
+    if (!serial_number.empty()) {
+        result += " " + serial_number;
+    }
+
+    return result;
 }
 
-vector<PortInfo>
-serial::list_ports()
+static PortInfo getSysfsInfo(const std::string &device_path)
 {
-    vector<PortInfo> results;
+    std::string device_name = getBasename(device_path);
+    std::string friendly_name;
+    std::string hardware_id;
+    std::string sys_device_path = "/sys/class/tty/" + device_name + "/device";
 
-    vector<string> search_globs;
-    search_globs.push_back("/dev/ttyACM*");
-    search_globs.push_back("/dev/ttyS*");
-    search_globs.push_back("/dev/ttyUSB*");
-    search_globs.push_back("/dev/tty.*");
-    search_globs.push_back("/dev/cu.*");
+    if (device_name.compare(0, 6, "ttyUSB") == 0) {
+        sys_device_path = getDirname(getDirname(getRealpath(sys_device_path)));
 
-    vector<string> devices_found = glob( search_globs );
+        if (pathExists(sys_device_path)) {
+            friendly_name = usb_sysfs_friendly_name(sys_device_path);
+            hardware_id = usb_sysfs_hw_string(sys_device_path);
+        }
 
-    vector<string>::iterator iter = devices_found.begin();
+    } else if (device_name.compare(0,6,"ttyACM") == 0) {
+        sys_device_path = getDirname(getRealpath(sys_device_path));
 
-    while( iter != devices_found.end() )
-    {
-        string device = *iter++;
+        if ( pathExists(sys_device_path)) {
+            friendly_name = usb_sysfs_friendly_name(sys_device_path);
+            hardware_id = usb_sysfs_hw_string(sys_device_path);
+        }
 
-        vector<string> sysfs_info = get_sysfs_info( device );
+    } else {
+        std::string sys_id_path = sys_device_path + "/id";
 
-        string friendly_name = sysfs_info[0];
-
-        string hardware_id = sysfs_info[1];
-
-        PortInfo device_entry;
-        device_entry.port = device;
-        device_entry.description = friendly_name;
-        device_entry.hardware_id = hardware_id;
-
-        results.push_back( device_entry );
+        if (pathExists(sys_id_path)) {
+            hardware_id = readLine(sys_id_path);
+        }
 
     }
 
-    return results;
+    if (friendly_name.empty()) {
+        friendly_name = device_name;
+    }
+
+
+    if (hardware_id.empty()) {
+        hardware_id = "n/a";
+    }
+
+    PortInfo port;
+    port.port = getBasename(device_path);
+    port.device = device_path;
+    port.description = friendly_name;
+    port.hardware_id = hardware_id;
+
+    return port;
+}
+
+std::vector<PortInfo> listPorts()
+{
+    std::vector<PortInfo> ports;
+
+    std::vector<std::string> patterns;
+    patterns.push_back("/dev/ttyACM*");
+    //patterns.push_back("/dev/ttyS*");
+    patterns.push_back("/dev/ttyUSB*");
+    //patterns.push_back("/dev/tty.*");
+    //patterns.push_back("/dev/cu.*");
+
+    std::vector<std::string> paths = searchPathname(patterns);
+
+    for (const std::string &path: paths) {
+        PortInfo port = getSysfsInfo(path);
+        ports.push_back( port );
+    }
+
+    return ports;
 }
 #endif // UNIX and APPLE
 
