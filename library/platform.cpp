@@ -332,47 +332,29 @@ serial::list_ports()
 // Windows specific functions
 #if defined(_WIN32)
 
-#include <limits>
-#include <sstream>
-#include <exception>
-#include <stdexcept>
+#include <iostream>
 #include <tchar.h>
 #include <windows.h>
 #include <setupapi.h>
 #include <initguid.h>
 #include <devguid.h>
 
-//using serial::PortInfo;
-using std::vector;
-using std::string;
-using std::wstring;
-
 static const DWORD port_name_max_length = 256;
 static const DWORD friendly_name_max_length = 256;
 static const DWORD hardware_id_max_length = 256;
 
-inline std::wstring _prefix_port_if_needed(const std::wstring &input)
-{
-    static const std::wstring windows_com_port_prefix = L"\\\\.\\";
-    if (input.compare(windows_com_port_prefix) != 0)
-    {
-        return windows_com_port_prefix + input;
-    }
-    return input;
-}
-
 // Convert a wide Unicode string to an UTF8 string
-std::string utf8_encode(const std::wstring &wstr)
+static std::string wstringUtf16TostringUtf8(const std::wstring &wstr)
 {
     int size_needed = WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), NULL, 0, NULL, NULL);
-    std::string strTo( size_needed, 0 );
-    WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), &strTo[0], size_needed, NULL, NULL);
-    return strTo;
+    std::string str( size_needed, 0 );
+    WideCharToMultiByte(CP_UTF8, 0, &wstr[0], (int)wstr.size(), &str[0], size_needed, NULL, NULL);
+    return str;
 }
 
 std::vector<PortInfo> listPorts()
 {
-    std::vector<PortInfo> ports_found;
+    std::vector<PortInfo> ports;
 
     HDEVINFO device_info_set = SetupDiGetClassDevs((const GUID *) &GUID_DEVCLASS_PORTS, NULL, NULL, DIGCF_PRESENT);
     unsigned int device_info_set_index = 0;
@@ -429,25 +411,32 @@ std::vector<PortInfo> listPorts()
         }
 
 #ifdef UNICODE
-        std::string portName = utf8_encode(port_name);
-        std::string friendlyName = utf8_encode(friendly_name);
-        std::string hardwareId = utf8_encode(hardware_id);
+        std::string portName = wstringUtf16TostringUtf8(port_name);
+        std::string friendlyName = wstringUtf16TostringUtf8(friendly_name);
+        std::string hardwareId = wstringUtf16TostringUtf8(hardware_id);
 #else
         std::string portName = port_name;
         std::string friendlyName = friendly_name;
         std::string hardwareId = hardware_id;
 #endif
 
-        PortInfo port_entry;
-        port_entry.port = portName;
-        port_entry.description = friendlyName;
-        port_entry.hardware_id = hardwareId;
+        PortInfo port;
+        port.port = portName;
+        port.description = friendlyName;
+        port.hardware_id = hardwareId;
 
-        ports_found.push_back(port_entry);
+        std::string prefix = "\\\\.\\";
+        if (port.port.compare(0, prefix.size(), prefix) == 0) {
+            port.device = port.port;
+        } else {
+            port.device = prefix + port.port;
+        }
+
+        ports.push_back(port);
     }
 
     SetupDiDestroyDeviceInfoList(device_info_set);
 
-    return ports_found;
+    return ports;
 }
 #endif // WINDOWS

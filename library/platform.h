@@ -5,11 +5,11 @@
 #include <string>
 
 struct PortInfo {
-    /// Address of the serial port.
+    /// Port name, human readible form
     std::string port;
-    /// Description of serial device if available.
+    /// Port device, used for creating Serial
+    std::string device;
     std::string description;
-    /// Hardware ID (e.g. VID:PID of USB serial devices) or "n/a" if not available.
     std::string hardware_id;
 };
 

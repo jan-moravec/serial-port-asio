@@ -32,11 +32,18 @@ public:
 
     /// Synchronous operations
     int write(const uint8_t *buffer, std::size_t size);
+    int write(const std::string &message);
     int write(const uint8_t *buffer, std::size_t size, const std::chrono::steady_clock::duration &timeout);
+    int write(const std::string &message, const std::chrono::steady_clock::duration &timeout);
+
     int readSome(uint8_t *buffer, std::size_t size);
+    int readSome(std::string &message);
     int readSome(uint8_t *buffer, std::size_t size, const std::chrono::steady_clock::duration &timeout);
+    int readSome(std::string &message, const std::chrono::steady_clock::duration &timeout);
     int readExactly(uint8_t *buffer, std::size_t size);
+    int readExactly(std::string &message);
     int readExactly(uint8_t *buffer, std::size_t size, const std::chrono::steady_clock::duration &timeout);
+    int readExactly(std::string &message, const std::chrono::steady_clock::duration &timeout);
     int readUntil(std::string &buffer, const std::string &delim);
     int readUntil(std::string &buffer, const std::string &delim, const std::chrono::steady_clock::duration &timeout);
 

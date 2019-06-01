@@ -39,11 +39,10 @@ void Serial::open(const std::string &port)
 void Serial::close()
 {
     if (opened) {
+        opened = false;
         serial_port->cancel();
         serial_port->close();
         io_context->stop();
-
-        opened = false;
     }
 }
 
@@ -189,6 +188,11 @@ int Serial::write(const uint8_t *buffer, std::size_t size)
     return length;
 }
 
+int Serial::write(const std::string &message)
+{
+    return write(reinterpret_cast<const uint8_t *>(&message[0]), message.size());
+}
+
 int Serial::write(const uint8_t *buffer, std::size_t size, const std::chrono::steady_clock::duration &timeout)
 {
     boost::system::error_code ec;
@@ -209,6 +213,11 @@ int Serial::write(const uint8_t *buffer, std::size_t size, const std::chrono::st
     return length;
 }
 
+int Serial::write(const std::string &message, const std::chrono::steady_clock::duration &timeout)
+{
+    return write(reinterpret_cast<const uint8_t *>(&message[0]), message.size(), timeout);
+}
+
 int Serial::readSome(uint8_t *buffer, std::size_t size)
 {
     boost::system::error_code ec;
@@ -219,6 +228,11 @@ int Serial::readSome(uint8_t *buffer, std::size_t size)
     }
 
     return length;
+}
+
+int Serial::readSome(std::string &message)
+{
+    return readSome(reinterpret_cast<uint8_t *>(&message[0]), message.size());
 }
 
 int Serial::readSome(uint8_t *buffer, std::size_t size, const std::chrono::steady_clock::duration &timeout)
@@ -241,6 +255,11 @@ int Serial::readSome(uint8_t *buffer, std::size_t size, const std::chrono::stead
     return length;
 }
 
+int Serial::readSome(std::string &message, const std::chrono::steady_clock::duration &timeout)
+{
+    return readSome(reinterpret_cast<uint8_t *>(&message[0]), message.size(), timeout);
+}
+
 int Serial::readExactly(uint8_t *buffer, std::size_t size)
 {
     boost::system::error_code ec;
@@ -251,6 +270,11 @@ int Serial::readExactly(uint8_t *buffer, std::size_t size)
     }
 
     return length;
+}
+
+int Serial::readExactly(std::string &message)
+{
+    return readExactly(reinterpret_cast<uint8_t *>(&message[0]), message.size());
 }
 
 int Serial::readExactly(uint8_t *buffer, std::size_t size, const std::chrono::steady_clock::duration &timeout)
@@ -271,6 +295,11 @@ int Serial::readExactly(uint8_t *buffer, std::size_t size, const std::chrono::st
     }
 
     return n;
+}
+
+int Serial::readExactly(std::string &message, const std::chrono::steady_clock::duration &timeout)
+{
+    return readExactly(reinterpret_cast<uint8_t *>(&message[0]), message.size(), timeout);
 }
 
 int Serial::readUntil(std::string &buffer, const std::string &delim)
@@ -340,7 +369,8 @@ void Serial::readAsyncRecieve(const boost::system::error_code& ec, size_t size)
 
 void Serial::readAsyncProcess(size_t size)
 {
-    std::cout << __PRETTY_FUNCTION__ << ": Recieved " << size << " bytes." << std::endl;
+    std::cout << __PRETTY_FUNCTION__ << ": Recieved " << size << " bytes:" << std::endl;
+    std::cout  << (char *)buffer_read.get() << std::endl;
 }
 
 bool Serial::runFor(const std::chrono::steady_clock::duration &timeout)
