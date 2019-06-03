@@ -21,6 +21,5 @@ win32 {
 }
 
 unix {
-    LIBS += -lboost_thread -lboost_system -lboost_timer -lboost_serialization -lboost_coroutine -lboost_atomic \
-            -lboost_chrono -lboost_wserialization -lpthread
+    LIBS += -lboost_system -lpthread
 }

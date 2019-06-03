@@ -334,43 +334,42 @@ int Serial::readUntil(std::string &buffer, const std::string &delim, const std::
     return n;
 }
 
-void Serial::readAsyncStart()
+void Serial::readAsynchronousStart(unsigned buffer_size)
 {
+    buffer_read_size = buffer_size;
     buffer_read = std::make_unique<uint8_t[]>(buffer_read_size);
 
+    // IO context must run in backround
     std::thread([this]{
         io_context->run();
     }).detach();
 
-    readAsync();
+    readAsynchronous();
 }
 
-void Serial::readAsync()
+void Serial::readAsynchronous()
 {
     serial_port->async_read_some(boost::asio::buffer(buffer_read.get(), buffer_read_size),
-                                 [&](const boost::system::error_code& result_error, std::size_t result_n)
+                                 [&](const boost::system::error_code& ec, std::size_t size)
                                  {
-                                     readAsyncRecieve(result_error, result_n);
+                                     // If closed or error end the loop.
+                                     if (!opened) {
+                                         return;
+                                     }
+                                     if (checkError(ec, __PRETTY_FUNCTION__)) {
+                                         return;
+                                     }
+                                     // Process data
+                                     readAsynchronousProcess(buffer_read.get(), size);
+                                     // Recursion
+                                     readAsynchronous();
                                  });
 }
 
-void Serial::readAsyncRecieve(const boost::system::error_code& ec, size_t size)
-{
-    if (!opened) {
-        return;
-    }
-    if (checkError(ec, __PRETTY_FUNCTION__)) {
-        return;
-    }
-
-    readAsyncProcess(size);
-    readAsync();
-}
-
-void Serial::readAsyncProcess(size_t size)
+void Serial::readAsynchronousProcess(uint8_t *buffer, size_t size)
 {
     std::cout << __PRETTY_FUNCTION__ << ": Recieved " << size << " bytes:" << std::endl;
-    std::cout  << (char *)buffer_read.get() << std::endl;
+    std::cout  << (char *)buffer << std::endl;
 }
 
 bool Serial::runFor(const std::chrono::steady_clock::duration &timeout)
@@ -391,7 +390,7 @@ bool Serial::checkError(const boost::system::error_code &ec, const std::string &
 {
     if (ec) {
         if (debug) {
-            std::cout << text << ": " << ec.message() << std::endl;
+            std::cerr << text << ": " << ec.message() << std::endl;
         }
         return true;
     }
@@ -403,7 +402,7 @@ bool Serial::checkError(const boost::system::error_code &ec, bool timedout, cons
 {
     if (!timedout && ec) {
         if (debug) {
-            std::cout << text << ": " << ec.message() << std::endl;
+            std::cerr << text << ": " << ec.message() << std::endl;
         }
         return true;
     }

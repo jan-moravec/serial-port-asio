@@ -5,6 +5,8 @@
 #include "library/serial.h"
 #include "library/platform.h"
 
+/// Test speed of serial device connected to loop
+/// It generates messages, sends them, recieves them and checks the values.
 void testSpeed(Serial &serial, unsigned bps)
 {
     if (serial.setBaudRate(bps) != 0) {
@@ -65,25 +67,26 @@ void testSpeed(Serial &serial, unsigned bps)
     std::cout << "Bitrate: " << bps << " bps, Speed: " << speed << " B/s = " << speed / 1000.0 << " KB/s = " <<  speed / 1000000.0 << " MB/s" << std::endl;
 }
 
+/// Example of a child for Serial class with asynchronous read
 class SerialTest: public Serial
 {
 public:
     SerialTest(const std::string &port): Serial(port) {
-        setBaudRate(115200);
-        setFlowControl(boost::asio::serial_port_base::flow_control::type::none);
-        setParity(boost::asio::serial_port_base::parity::type::none);
-        setStopBits(boost::asio::serial_port_base::stop_bits::type::one);
-        setCharacterSize(8);
+        if (isOpened()) {
+            setBaudRate(115200);
+            setFlowControl(boost::asio::serial_port_base::flow_control::type::none);
+            setParity(boost::asio::serial_port_base::parity::type::none);
+            setStopBits(boost::asio::serial_port_base::stop_bits::type::one);
+            setCharacterSize(8);
 
-        readAsyncStart();
+            readAsynchronousStart();
+        }
     }
-
-    ~SerialTest() override {}
 };
 
 int main()
 {
-    std::vector<PortInfo> ports = listPorts();
+    std::vector<PortInfo> ports = GetSerialPorts();
 
     std::cout << "Found " << ports.size() << " serial port devices." << std::endl;
 
@@ -107,32 +110,36 @@ int main()
     if (ports.size() > 0) {
         std::cout << "Testing functions " << ports.at(0).device << std::endl;
         Serial serial(ports.at(0).device);
-        serial.setBaudRate(115200);
-        serial.setFlowControl(boost::asio::serial_port_base::flow_control::type::none);
-        serial.setParity(boost::asio::serial_port_base::parity::type::none);
-        serial.setStopBits(boost::asio::serial_port_base::stop_bits::type::one);
-        serial.setCharacterSize(8);
+        if (serial) {
+            serial.setBaudRate(115200);
+            serial.setFlowControl(boost::asio::serial_port_base::flow_control::type::none);
+            serial.setParity(boost::asio::serial_port_base::parity::type::none);
+            serial.setStopBits(boost::asio::serial_port_base::stop_bits::type::one);
+            serial.setCharacterSize(8);
 
-        std::string message;
-        message.resize(128);
+            std::string message;
+            message.resize(128);
 
-        serial.write("Testing 123...");
-        serial.readSome(message);
-        std::cout << message << std::endl;
+            serial.write("Testing 123...");
+            serial.readSome(message);
+            std::cout << message << std::endl;
 
-        message.clear();
-        serial.write("Testing 456...\n");
-        serial.readUntil(message, "\n");
-        std::cout << message;
+            message.clear();
+            serial.write("Testing 456...\n");
+            serial.readUntil(message, "\n");
+            std::cout << message;
+        }
     }
 
     if (ports.size() > 0) {
         std::cout << "Testing asynchronous read " << ports.at(0).device << std::endl;
         SerialTest test(ports.at(0).device);
 
-        for (int i = 0; i < 4; ++i) {
-            test.write("Testing " + std::to_string(i));
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        if (test) {
+            for (int i = 0; i < 4; ++i) {
+                test.write("Testing " + std::to_string(i));
+                std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            }
         }
     }
 

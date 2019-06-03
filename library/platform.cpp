@@ -10,7 +10,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-static std::vector<std::string> searchPathname(const std::vector<std::string>& patterns)
+static std::vector<std::string> searchPathname(const std::vector<std::string> &patterns)
 {
     std::vector<std::string> paths;
     glob_t glob_results{};
@@ -178,7 +178,7 @@ static PortInfo getSysfsInfo(const std::string &device_path)
     return port;
 }
 
-std::vector<PortInfo> listPorts()
+std::vector<PortInfo> GetSerialPorts()
 {
     std::vector<PortInfo> ports;
 
@@ -223,7 +223,7 @@ static std::string wstringUtf16TostringUtf8(const std::wstring &wstr)
     return str;
 }
 
-std::vector<PortInfo> listPorts()
+std::vector<PortInfo> GetSerialPorts()
 {
     std::vector<PortInfo> ports;
 
